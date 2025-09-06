@@ -72,6 +72,7 @@ public:
     std::vector<NumberPost*>* GetNumbers(){return &NUMBERS;};
 
     string name(){return "ClassFlowPostProcessing";};
+    void sendResultsToAPI();
 };
 
 #endif //CLASSFFLOWPOSTPROCESSING_H

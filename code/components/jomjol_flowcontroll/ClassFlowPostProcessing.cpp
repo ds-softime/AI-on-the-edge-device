@@ -990,7 +990,7 @@ bool ClassFlowPostProcessing::doFlow(string zwtime) {
         LogFile.WriteToFile(ESP_LOG_INFO, TAG, _zw);
         WriteDataLog(j);
     }
-
+    sendResultsToAPI();
     SavePreValue();
     return true;
 }
@@ -1177,3 +1177,44 @@ string ClassFlowPostProcessing::getReadoutTimeStamp(int _number) {
 string ClassFlowPostProcessing::getReadoutError(int _number) {
     return NUMBERS[_number]->ErrorMessageText;
 }
+
+
+#include "certs.h"
+#include <cJSON.h>
+#include <esp_http_client.h>
+
+void ClassFlowPostProcessing::sendResultsToAPI() {
+    cJSON *root = cJSON_CreateObject();
+    std::string results = NUMBERS[0]->ReturnRawValue;
+    cJSON_AddStringToObject(root, "results", results.c_str());
+    char *jsonStr = cJSON_PrintUnformatted(root);
+    std::string result(jsonStr);
+    free(jsonStr);
+    cJSON_Delete(root);
+
+    ESP_LOGI("API", "POST-Content: %s", result.c_str());
+
+    esp_http_client_config_t config = {};
+    config.url = API_URL;
+    config.method = HTTP_METHOD_POST;
+    config.cert_pem = root_cert_pem;
+    config.timeout_ms = 5000;
+
+    esp_http_client_handle_t client = esp_http_client_init(&config);
+
+    esp_http_client_set_header(client, "Content-Type", "application/json");
+    esp_http_client_set_header(client, "Authorization", "Bearer " API_PASSWORD);
+    esp_http_client_set_post_field(client, result.c_str(), result.length());
+
+    esp_err_t err = esp_http_client_perform(client);
+
+
+    if (err == ESP_OK) {
+        ESP_LOGI("API", "POST erfolgreich, Status = %d", esp_http_client_get_status_code(client));
+    } else {
+        ESP_LOGE("API", "HTTP POST fehlgeschlagen: %s", esp_err_to_name(err));
+    }
+
+    esp_http_client_cleanup(client);
+}
+
